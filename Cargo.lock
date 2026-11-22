@@ -115,6 +115,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "novaserve-sched"
+version = "0.1.0"
+dependencies = [
+ "novaserve-frontend",
+ "novaserve-kv",
+ "novaserve-model",
+ "novaserve-tensor",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "novaserve-tensor"
 version = "0.1.0"
 dependencies = [
