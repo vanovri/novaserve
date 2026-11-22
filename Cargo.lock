@@ -93,6 +93,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "novaserve-kv"
+version = "0.1.0"
+dependencies = [
+ "novaserve-tensor",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "novaserve-tensor"
 version = "0.1.0"
 dependencies = [

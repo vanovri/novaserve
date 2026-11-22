@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/novaserve-tensor",
     "crates/novaserve-frontend",
+    "crates/novaserve-kv",
 ]
 
 [workspace.package]
