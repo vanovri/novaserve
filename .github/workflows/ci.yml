@@ -1,0 +1,42 @@
+name: NovaServe CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify-engine:
+    name: Rust Engine, Miri, Chaos Oracle & WASM Studio
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Stable + Nightly Miri + wasm32 Target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Install Nightly Miri
+        run: |
+          rustup toolchain install nightly --component miri
+          cargo +nightly miri setup
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Studio Dependencies
+        working-directory: studio
+        run: npm install
+
+      - name: Run Miri Undefined-Behavior Gate (novaserve-tensor)
+        run: cargo +nightly miri test -p novaserve-tensor
+
+      - name: Run Full End-to-End Verification Gate (make verify-all)
+        run: make NIGHTLY=nightly verify-all
