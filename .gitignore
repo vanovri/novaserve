@@ -1,0 +1,9 @@
+/target
+/logs
+/studio/node_modules
+/studio/dist
+*.gguf
+*.safetensors
+*.swap
+.DS_Store
+Thumbs.db
