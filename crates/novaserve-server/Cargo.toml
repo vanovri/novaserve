@@ -1,0 +1,30 @@
+[package]
+name = "novaserve-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "novaserve-server"
+path = "src/bin/novaserve-server.rs"
+
+[[bin]]
+name = "novaserve-bench"
+path = "src/bin/novaserve-bench.rs"
+
+[dependencies]
+novaserve-tensor = { path = "../novaserve-tensor" }
+novaserve-frontend = { path = "../novaserve-frontend" }
+novaserve-kv = { path = "../novaserve-kv" }
+novaserve-model = { path = "../novaserve-model" }
+novaserve-sched = { path = "../novaserve-sched" }
+novaserve-sampler = { path = "../novaserve-sampler" }
+tokio.workspace = true
+axum.workspace = true
+hyper.workspace = true
+clap.workspace = true
+parking_lot.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true

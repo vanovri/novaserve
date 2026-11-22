@@ -1,0 +1,87 @@
+{
+  "simd_backend": "Avx2Fma",
+  "model_arch": "Tiny-16M GQA (dim=256, layers=4, n_heads=8, n_kv_heads=2, vocab=512)",
+  "quantization": [
+    {
+      "dtype": "FP32",
+      "weight_megabytes": 11.01141357421875,
+      "compression_ratio_vs_fp32": 1.0,
+      "single_stream_tok_per_sec": 187.86098287267424,
+      "single_stream_tpot_ms": 5.323085106382979,
+      "batched_16_tok_per_sec": 771.1259131139901
+    },
+    {
+      "dtype": "Q8_0",
+      "weight_megabytes": 2.93328857421875,
+      "compression_ratio_vs_fp32": 3.75394827191577,
+      "single_stream_tok_per_sec": 588.4835030544798,
+      "single_stream_tpot_ms": 1.699282978723404,
+      "batched_16_tok_per_sec": 1232.2559357070465
+    },
+    {
+      "dtype": "Q4_0",
+      "weight_megabytes": 1.55828857421875,
+      "compression_ratio_vs_fp32": 7.0663507109004735,
+      "single_stream_tok_per_sec": 557.5557704056515,
+      "single_stream_tpot_ms": 1.7935425531914893,
+      "batched_16_tok_per_sec": 1189.897399237536
+    }
+  ],
+  "batching": [
+    {
+      "mode": "Sequential Locking (batch=1)",
+      "clients": 32,
+      "aggregate_tok_per_sec": 410.50194392447236,
+      "ttft_p50_ms": 919.8524,
+      "ttft_p99_ms": 1756.3521,
+      "itl_p50_ms": 1.4338,
+      "itl_p99_ms": 3.4399
+    },
+    {
+      "mode": "Continuous Batching (32 seqs)",
+      "clients": 32,
+      "aggregate_tok_per_sec": 928.586948202622,
+      "ttft_p50_ms": 375.9823,
+      "ttft_p99_ms": 375.9959,
+      "itl_p50_ms": 13.9101,
+      "itl_p99_ms": 375.9988
+    },
+    {
+      "mode": "Continuous + Chunked Prefill (B=64)",
+      "clients": 32,
+      "aggregate_tok_per_sec": 617.2284369678364,
+      "ttft_p50_ms": 495.45660000000004,
+      "ttft_p99_ms": 992.032,
+      "itl_p50_ms": 28.2029,
+      "itl_p99_ms": 45.676899999999996
+    }
+  ],
+  "chunked_prefill_jitter": {
+    "unchunked_midflight_decode_itl_p99_ms": 274.5453,
+    "chunked_64_midflight_decode_itl_p99_ms": 33.5807,
+    "jitter_reduction_factor": 8.175687225102514
+  },
+  "radix_ablation": {
+    "shared_system_prompt_tokens": 512,
+    "requests": 24,
+    "radix_off_ttft_p50_ms": 221.8331,
+    "radix_off_ttft_p99_ms": 292.94160000000005,
+    "radix_off_total_ms": 5802.9938999999995,
+    "radix_on_ttft_p50_ms": 11.1261,
+    "radix_on_ttft_p99_ms": 249.86630000000002,
+    "radix_on_total_ms": 897.8222999999999,
+    "ttft_p50_speedup_x": 19.938082526671522,
+    "total_wall_speedup_x": 6.463410298452155,
+    "kv_block_hit_rate_pct": 95.83333333333334
+  },
+  "speculative_ablation": {
+    "lookahead_k": 4,
+    "acceptance_alpha_pct": 65.63245823389022,
+    "mean_tokens_per_target_pass": 3.5943396226415096,
+    "baseline_tok_per_sec": 781.9385233416795,
+    "baseline_tpot_ms": 1.2788729166666666,
+    "speculative_tok_per_sec": 1113.768880775392,
+    "speculative_tpot_ms": 0.89785234375,
+    "tpot_speedup_x": 1.4243688570497943
+  }
+}

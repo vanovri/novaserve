@@ -15,7 +15,8 @@ pub use speculative::{
     RejectionOutcome,
 };
 pub use types::{
-    collect_top_logprobs, sample_categorical, BuiltinSampler, CompletedRequest, FinishReason,
-    PreemptionMode, RequestParams, SampledToken, SamplerStrategy, SamplingConfig, SchedulerConfig,
-    SequenceOutput, SequenceStepDelta, SpeculativeTrace, StepSummary, TokenLogprob,
+    collect_top_logprobs, sample_categorical, ActiveSequenceSnapshot, BuiltinSampler,
+    CompletedRequest, FinishReason, GrammarCandidateLogit, GrammarStepXray, PreemptionMode,
+    RequestParams, SampledToken, SamplerStrategy, SamplingConfig, SchedulerConfig, SequenceOutput,
+    SequenceStatus, SequenceStepDelta, SpeculativeTrace, StepSummary, TokenLogprob,
 };

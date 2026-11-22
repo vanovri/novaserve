@@ -5,11 +5,12 @@
 use crate::error::SchedError;
 use crate::speculative::{leviathan_rejection_sample, AdaptiveLookaheadController};
 use crate::types::{
-    collect_top_logprobs, BuiltinSampler, CompletedRequest, FinishReason, PreemptionMode,
-    RequestParams, SampledToken, SamplerStrategy, SamplingConfig, SchedulerConfig, SequenceOutput,
+    collect_top_logprobs, ActiveSequenceSnapshot, BuiltinSampler, CompletedRequest, FinishReason,
+    GrammarCandidateLogit, GrammarStepXray, PreemptionMode, RequestParams, SampledToken,
+    SamplerStrategy, SamplingConfig, SchedulerConfig, SequenceOutput, SequenceStatus,
     SequenceStepDelta, SpeculativeTrace, StepSummary,
 };
-use novaserve_frontend::{BpeTokenizer, GrammarMatcher};
+use novaserve_frontend::{AllowedTokenMask, BpeTokenizer, GrammarMatcher};
 use novaserve_kv::{
     BlockAllocator, KvSlab, LogicalBlockTable, PhysicalBlockSnapshot, RadixCache,
     RadixNodeSnapshot, SwapEngine, SwappedHandle,
@@ -266,6 +267,96 @@ impl ServingEngine {
 
     pub fn snapshot_radix_tree(&self) -> Vec<RadixNodeSnapshot> {
         self.radix_cache.snapshot_tree(&self.allocator)
+    }
+
+    #[inline]
+    pub fn tokenizer(&self) -> Option<&Arc<BpeTokenizer>> {
+        self.tokenizer.as_ref()
+    }
+
+    #[inline]
+    pub fn step_counter(&self) -> u64 {
+        self.step_counter
+    }
+
+    /// Exports live per-sequence KV block ownership, prefill/decode progress, and grammar FSM state
+    /// for `novaserve-server`, `novaserve-top` TUI, and `novaserve-wasm` Studio.
+    pub fn inspect_active_sequences(&self) -> Vec<ActiveSequenceSnapshot> {
+        let mut out =
+            Vec::with_capacity(self.running.len() * 2 + self.swapped.len() + self.waiting.len());
+
+        for g in &self.running {
+            for c in &g.children {
+                let status = if c.table.num_tokens() + 1 < c.full_tokens.len() {
+                    SequenceStatus::Prefilling
+                } else {
+                    SequenceStatus::Decoding
+                };
+                out.push(ActiveSequenceSnapshot {
+                    req_id: g.req_id,
+                    child_idx: c.child_idx,
+                    status,
+                    prompt_len: c.prompt_len,
+                    kv_tokens: c.table.num_tokens(),
+                    generated_tokens: c.full_tokens[c.prompt_len..].to_vec(),
+                    max_new_tokens: g.max_new_tokens,
+                    block_ids: c.table.blocks().iter().map(|b| b.0).collect(),
+                    swapped_blocks: 0,
+                    cached_prefix_tokens: g.cached_prefix_tokens,
+                    preemptions: g.preemptions,
+                    use_speculative: g.use_speculative,
+                    has_grammar: c.grammar.is_some(),
+                    dfa_state: c.grammar.as_ref().map(GrammarMatcher::state),
+                    total_dfa_states: c.grammar.as_ref().map(|gm| gm.cache().dfa().num_states()),
+                });
+            }
+        }
+
+        for g in &self.swapped {
+            for c in &g.children {
+                out.push(ActiveSequenceSnapshot {
+                    req_id: g.req_id,
+                    child_idx: c.child_idx,
+                    status: SequenceStatus::Swapped,
+                    prompt_len: c.prompt_len,
+                    kv_tokens: c.handle.num_tokens,
+                    generated_tokens: c.full_tokens[c.prompt_len..].to_vec(),
+                    max_new_tokens: g.max_new_tokens,
+                    block_ids: Vec::new(),
+                    swapped_blocks: c.handle.swap_slots.len(),
+                    cached_prefix_tokens: g.cached_prefix_tokens,
+                    preemptions: g.preemptions,
+                    use_speculative: g.use_speculative,
+                    has_grammar: c.grammar.is_some(),
+                    dfa_state: c.grammar.as_ref().map(GrammarMatcher::state),
+                    total_dfa_states: c.grammar.as_ref().map(|gm| gm.cache().dfa().num_states()),
+                });
+            }
+        }
+
+        for g in &self.waiting {
+            for c in &g.children {
+                out.push(ActiveSequenceSnapshot {
+                    req_id: g.req_id,
+                    child_idx: c.child_idx,
+                    status: SequenceStatus::Waiting,
+                    prompt_len: c.prompt_len,
+                    kv_tokens: c.table.num_tokens(),
+                    generated_tokens: c.full_tokens[c.prompt_len..].to_vec(),
+                    max_new_tokens: g.max_new_tokens,
+                    block_ids: c.table.blocks().iter().map(|b| b.0).collect(),
+                    swapped_blocks: 0,
+                    cached_prefix_tokens: g.cached_prefix_tokens,
+                    preemptions: g.preemptions,
+                    use_speculative: g.use_speculative,
+                    has_grammar: c.grammar.is_some(),
+                    dfa_state: c.grammar.as_ref().map(GrammarMatcher::state),
+                    total_dfa_states: c.grammar.as_ref().map(|gm| gm.cache().dfa().num_states()),
+                });
+            }
+        }
+
+        out
     }
 
     /// Submits a new inference request into `waiting`, returning its `req_id`.
@@ -973,6 +1064,10 @@ impl ServingEngine {
         let sampling = self.running[g_idx].sampling.clone();
 
         let child = &mut self.running[g_idx].children[c_idx];
+        let pre_grammar_meta = child
+            .grammar
+            .as_ref()
+            .map(|gm| (gm.state(), gm.cache().dfa().num_states(), gm.is_accepting()));
         let mask_arc = match (&child.grammar, &self.tokenizer) {
             (Some(gm), Some(tok)) => Some(gm.current_mask(tok)?),
             _ => None,
@@ -986,9 +1081,11 @@ impl ServingEngine {
             eos_id,
             &mut child.rng,
         )?;
+        let chosen_token_id = sampled.token_id;
 
         let mut new_tokens = Vec::with_capacity(4);
         let mut sampled_infos = Vec::with_capacity(4);
+        let mut forced_emitted = Vec::new();
 
         Self::commit_emitted_token(
             child,
@@ -1009,6 +1106,7 @@ impl ServingEngine {
                     if child.finish_reason.is_some() {
                         break;
                     }
+                    forced_emitted.push(ft);
                     let info = SampledToken {
                         token_id: ft,
                         logprob: 0.0,
@@ -1028,6 +1126,22 @@ impl ServingEngine {
             }
         }
 
+        if let (Some((dfa_state, total_dfa_states, is_accepting)), Some(mask)) =
+            (pre_grammar_meta, mask_arc.as_deref())
+        {
+            summary.grammar_xrays.push(Self::capture_grammar_xray(
+                req_id,
+                child.child_idx,
+                dfa_state,
+                total_dfa_states,
+                is_accepting,
+                mask,
+                row_logits,
+                chosen_token_id,
+                forced_emitted,
+            ));
+        }
+
         summary.deltas.push(SequenceStepDelta {
             req_id,
             child_idx: child.child_idx,
@@ -1036,6 +1150,63 @@ impl ServingEngine {
             finished: child.finish_reason,
         });
         Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn capture_grammar_xray(
+        req_id: u64,
+        child_idx: usize,
+        dfa_state: u32,
+        total_dfa_states: usize,
+        is_accepting: bool,
+        mask: &AllowedTokenMask,
+        raw_logits: &[f32],
+        chosen_token_id: u32,
+        forced_jump_tokens: Vec<u32>,
+    ) -> GrammarStepXray {
+        let mut allowed_pairs = Vec::new();
+        let mut masked_pairs = Vec::new();
+        let limit = raw_logits.len().min(mask.vocab_size());
+        for (i, &val) in raw_logits[..limit].iter().enumerate() {
+            let tid = i as u32;
+            if mask.is_allowed(tid) {
+                allowed_pairs.push(GrammarCandidateLogit {
+                    token_id: tid,
+                    raw_logit: val,
+                });
+            } else {
+                masked_pairs.push(GrammarCandidateLogit {
+                    token_id: tid,
+                    raw_logit: val,
+                });
+            }
+        }
+        allowed_pairs.sort_by(|a, b| {
+            b.raw_logit
+                .total_cmp(&a.raw_logit)
+                .then_with(|| a.token_id.cmp(&b.token_id))
+        });
+        masked_pairs.sort_by(|a, b| {
+            b.raw_logit
+                .total_cmp(&a.raw_logit)
+                .then_with(|| a.token_id.cmp(&b.token_id))
+        });
+        allowed_pairs.truncate(10);
+        masked_pairs.truncate(10);
+
+        GrammarStepXray {
+            req_id,
+            child_idx,
+            dfa_state,
+            total_dfa_states,
+            is_accepting,
+            allowed_count: mask.allowed_count(),
+            vocab_size: mask.vocab_size(),
+            top_allowed: allowed_pairs,
+            top_masked: masked_pairs,
+            chosen_token_id,
+            forced_jump_tokens,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1341,6 +1512,25 @@ impl ServingEngine {
             bonus_or_residual_token: outcome.final_token,
             accepted_count: outcome.accepted_draft_count,
         });
+
+        if let (Some(gm), Some(Some(mask0))) = (&child.grammar, step_masks.first()) {
+            let first_chosen = if outcome.accepted_draft_count > 0 {
+                draft_tokens[0]
+            } else {
+                outcome.final_token
+            };
+            summary.grammar_xrays.push(Self::capture_grammar_xray(
+                req_id,
+                child.child_idx,
+                gm.state(),
+                gm.cache().dfa().num_states(),
+                gm.is_accepting(),
+                mask0,
+                &target_logits[..vocab_sz],
+                first_chosen,
+                Vec::new(),
+            ));
+        }
 
         // 5. Emit accepted draft tokens (`0 .. accepted_draft_count`) + `final_token` (stopping early on EOS/max_new)
         let mut new_tokens = Vec::with_capacity(outcome.accepted_draft_count + 1);

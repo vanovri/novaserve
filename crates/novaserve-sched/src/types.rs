@@ -159,6 +159,54 @@ pub struct SequenceStepDelta {
     pub finished: Option<FinishReason>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GrammarCandidateLogit {
+    pub token_id: u32,
+    pub raw_logit: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GrammarStepXray {
+    pub req_id: u64,
+    pub child_idx: usize,
+    pub dfa_state: u32,
+    pub total_dfa_states: usize,
+    pub is_accepting: bool,
+    pub allowed_count: u32,
+    pub vocab_size: usize,
+    pub top_allowed: Vec<GrammarCandidateLogit>,
+    pub top_masked: Vec<GrammarCandidateLogit>,
+    pub chosen_token_id: u32,
+    pub forced_jump_tokens: Vec<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SequenceStatus {
+    Waiting,
+    Prefilling,
+    Decoding,
+    Swapped,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActiveSequenceSnapshot {
+    pub req_id: u64,
+    pub child_idx: usize,
+    pub status: SequenceStatus,
+    pub prompt_len: usize,
+    pub kv_tokens: usize,
+    pub generated_tokens: Vec<u32>,
+    pub max_new_tokens: usize,
+    pub block_ids: Vec<u32>,
+    pub swapped_blocks: usize,
+    pub cached_prefix_tokens: usize,
+    pub preemptions: u32,
+    pub use_speculative: bool,
+    pub has_grammar: bool,
+    pub dfa_state: Option<u32>,
+    pub total_dfa_states: Option<usize>,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct StepSummary {
     pub step_index: u64,
@@ -171,6 +219,7 @@ pub struct StepSummary {
     pub swapped_groups: usize,
     pub deltas: Vec<SequenceStepDelta>,
     pub speculative_traces: Vec<SpeculativeTrace>,
+    pub grammar_xrays: Vec<GrammarStepXray>,
     pub completed: Vec<CompletedRequest>,
     pub rolling_spec_alpha: f32,
     pub active_spec_k: usize,

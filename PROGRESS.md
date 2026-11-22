@@ -9,5 +9,5 @@
 | **M05** | `crates/novaserve-sched` | **DONE** | 32-Seq Squeeze (`Swap`=43 preempts, `Recompute`=245 preempts) + Speculative `K=4` + `wasm32` | `32/32` (`100%`) parity & `0` leaks on 32 KV blocks; Speculative `8` steps vs `37` (`4.6x` step reduction) |
 | **M06** | `crates/novaserve-sampler` | **DONE** | 10,000 Pathological Logits Fuzz + Shannon Entropy Monotonicity Proof + `wasm32` | `10,000/10,000` (`0` `NaN`/`Inf`), `O(V)` `select_nth` Top-K, exact shift-before-divide Softmax, `0.22s` |
 | **M07** | `crates/novaserve-oracle` | **DONE** | 5,000 Chaos Batch Scenarios (`20,960` seqs, `6,377` preempts) + 3-Regime Speculative TVD (`96k` runs) | `max_logprob_diff = 2.146e-6` (`<= 1e-4`), `TVD` = `0.0051..0.0082` (`< 0.015`), `chi2` = `10.79..17.25` (`df=15`) |
-| **M08** | `crates/novaserve-server` & `tui` | IN PROGRESS | 64-Client SSE/Disconnect Chaos + Headless TUI + Bench | — |
-| **M09** | `crates/novaserve-wasm` & `studio/` | PENDING | WASM Build + Studio Static Bundle + `make verify-all` | — |
+| **M08** | `crates/novaserve-server` & `tui` | **DONE** | 64-Client SSE/CoW/JSON-Schema/Disconnect Chaos (0 Leaks) + `120x40` Headless TUI + Release SLA Bench | `Q8_0` `3.75x` smaller (`1,232 tok/s`), Radix `95.8%` hit (`19.94x` `TTFT`), Chunked `8.18x` `ITL p99` drop, Spec `K=4` `1.42x` `TPOT` |
+| **M09** | `crates/novaserve-wasm` & `studio/` | IN PROGRESS | WASM Build + Studio Static Bundle + `make verify-all` | — |
