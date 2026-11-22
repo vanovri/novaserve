@@ -115,6 +115,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "novaserve-sampler"
+version = "0.1.0"
+dependencies = [
+ "novaserve-frontend",
+ "novaserve-sched",
+ "novaserve-tensor",
+ "parking_lot",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "novaserve-sched"
 version = "0.1.0"
 dependencies = [

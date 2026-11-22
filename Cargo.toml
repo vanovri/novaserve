@@ -6,6 +6,7 @@ members = [
     "crates/novaserve-kv",
     "crates/novaserve-model",
     "crates/novaserve-sched",
+    "crates/novaserve-sampler",
 ]
 
 [workspace.package]

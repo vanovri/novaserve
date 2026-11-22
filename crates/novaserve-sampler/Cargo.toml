@@ -1,0 +1,14 @@
+[package]
+name = "novaserve-sampler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+novaserve-tensor = { path = "../novaserve-tensor" }
+novaserve-frontend = { path = "../novaserve-frontend" }
+novaserve-sched = { path = "../novaserve-sched" }
+thiserror.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
