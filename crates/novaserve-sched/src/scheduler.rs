@@ -755,7 +755,20 @@ impl ServingEngine {
                 let cur_kv = g.children[c_idx].table.num_tokens();
                 let full_len = g.children[c_idx].full_tokens.len();
                 let uncached_rem = full_len - cur_kv;
-                let chunk_target = uncached_rem.min(remaining_budget);
+                // When Speculative Decoding is active for this sequence (`active_k >= 1`),
+                // prefill up to `full_len - 1` so the final prompt token immediately enters
+                // `run_speculative_group_step` and generates token 0..K speculatively!
+                let target_rem = if g.use_speculative
+                    && active_k >= 1
+                    && self.draft.is_some()
+                    && uncached_rem > 1
+                    && g.max_new_tokens >= 2
+                {
+                    uncached_rem - 1
+                } else {
+                    uncached_rem
+                };
+                let chunk_target = target_rem.min(remaining_budget);
 
                 let seat_idx = seat_list.len();
                 let mut scheduled_for_child = 0usize;
@@ -1332,7 +1345,7 @@ impl ServingEngine {
         // 5. Emit accepted draft tokens (`0 .. accepted_draft_count`) + `final_token` (stopping early on EOS/max_new)
         let mut new_tokens = Vec::with_capacity(outcome.accepted_draft_count + 1);
         let mut sampled_infos = Vec::with_capacity(outcome.accepted_draft_count + 1);
-        let mut consumed_into_history = 0usize;
+        let mut accepted_emitted_drafts = 0usize;
 
         for i in 0..outcome.accepted_draft_count {
             let dt = draft_tokens[i];
@@ -1355,7 +1368,7 @@ impl ServingEngine {
             if child.finish_reason.is_some() {
                 break;
             }
-            consumed_into_history += 1;
+            accepted_emitted_drafts += 1;
         }
 
         if child.finish_reason.is_none() {
@@ -1377,15 +1390,13 @@ impl ServingEngine {
                 &mut new_tokens,
                 &mut sampled_infos,
             );
-            if child.finish_reason.is_none() {
-                consumed_into_history += 1;
-            }
         }
 
-        // Roll back BOTH `Target` and `Draft` KV caches cleanly to `full_tokens.len() - 1`!
+        // Exact number of tokens in `child.table` whose K/V in `KvSlab` matches `child.full_tokens`
+        // is `m + 1 + accepted_emitted_drafts` (positions `0 ..= m + accepted_emitted_drafts`).
+        let valid_kv_in_slab = (m + 1 + accepted_emitted_drafts).min(child.full_tokens.len());
         let desired_kv_len = if child.finish_reason.is_some() {
-            // Keep valid prefix for RadixCache insertion on retirement
-            (m + consumed_into_history).min(child.full_tokens.len())
+            valid_kv_in_slab
         } else {
             child.full_tokens.len() - 1
         };

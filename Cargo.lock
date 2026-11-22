@@ -115,6 +115,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "novaserve-oracle"
+version = "0.1.0"
+dependencies = [
+ "novaserve-frontend",
+ "novaserve-kv",
+ "novaserve-model",
+ "novaserve-sampler",
+ "novaserve-sched",
+ "novaserve-tensor",
+ "rayon",
+ "serde",
+]
+
+[[package]]
 name = "novaserve-sampler"
 version = "0.1.0"
 dependencies = [
