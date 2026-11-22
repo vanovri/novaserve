@@ -102,6 +102,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "novaserve-model"
+version = "0.1.0"
+dependencies = [
+ "novaserve-frontend",
+ "novaserve-kv",
+ "novaserve-tensor",
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "novaserve-tensor"
 version = "0.1.0"
 dependencies = [

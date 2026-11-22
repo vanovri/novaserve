@@ -5,8 +5,8 @@
 | **M01** | `crates/novaserve-tensor` | **DONE** | Miri (6/6, 0 UB) + 1,000 Diff GEMM/Quant + 10,000 GGUF/Safetensors Fuzz + `wasm32` | `FP32` GEMM `70.46 GFLOPS`, `max_abs_err < 1e-5`, `Q8_0 cos > 0.999`, `Q4_0 cos > 0.990`, `SIMD == Scalar` `0` drift |
 | **M02** | `crates/novaserve-frontend` | **DONE** | 10,000 BPE Lossless/UTF-8 Stream Fuzz + 5,000 Adversarial JSON-Schema DFA + `wasm32` | `5,000/5,000` (`100%`) valid JSON schemas, `0.494 µs` bitmask apply (`V=4096`), `30,990` jump tokens, `0.74s` total |
 | **M03** | `crates/novaserve-kv` | **DONE** | 10,000 Stateful CoW/Radix/Swap Chaos Fuzzer (0 Leaks, 100% Canary Integrity) + `wasm32` | `0%` ext fragmentation, `85.3%` Radix hit rate, `619` LRU evictions, `251` swaps, `0.13s` release fuzz |
-| **M04** | `crates/novaserve-model` | IN PROGRESS | Contiguous vs Scrambled Paged/Radix/Chunked (`< 1e-5`) | — |
-| **M05** | `crates/novaserve-sched` | PENDING | 32-Seq Extreme Memory Squeeze (`Swap` & `Recompute`) | — |
+| **M04** | `crates/novaserve-model` | **DONE** | 200-Tok Scrambled Paged + Radix CoW + Chunked + 8-Seq Batch + 300-Tok FlashDecoding + `wasm32` | `max_abs_diff = 1.371e-6` (`< 1e-5`), GGUF (`F32`/`Q8_0`/`Q4_0`) & Safetensors `0` reload drift |
+| **M05** | `crates/novaserve-sched` | IN PROGRESS | 32-Seq Extreme Memory Squeeze (`Swap` & `Recompute`) + Exact Speculative Decoding | — |
 | **M06** | `crates/novaserve-sampler` | PENDING | 10k Pathological Logits Fuzz + Monotonicity Proof | — |
 | **M07** | `crates/novaserve-oracle` | PENDING | 5,000 Chaos Batch Scenarios + 3-Regime Speculative TVD | — |
 | **M08** | `crates/novaserve-server` & `tui` | PENDING | 64-Client SSE/Disconnect Chaos + Headless TUI + Bench | — |
